@@ -15,7 +15,23 @@ document.querySelectorAll('.top-menu button').forEach(btn => btn.onclick = () =>
 
 async function getJson(url, opts) {
   const res = await fetch(url, opts);
-  return await res.json();
+  const contentType = res.headers.get('content-type') || '';
+
+  if (contentType.includes('application/json')) {
+    const payload = await res.json();
+    if (!res.ok) {
+      throw new Error(payload?.error || `Erro HTTP ${res.status}`);
+    }
+    return payload;
+  }
+
+  const text = await res.text();
+  if (!res.ok) {
+    const clean = text.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 220);
+    throw new Error(clean || `Erro HTTP ${res.status}`);
+  }
+
+  throw new Error('Resposta inválida da API (esperado JSON).');
 }
 
 async function refreshSidebar() {
