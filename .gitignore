@@ -11,6 +11,7 @@ steamcmd/logs*
 steamcmd/pack*
 steamcmd/public*
 steamcmd/site*
+steamcmd/.crash
 steamcmd/steamapps*
 steamcmd/userdata*
 steamcmd/steamerrorreporter.exe
