@@ -31,11 +31,26 @@ class DayZModInstaller:
         self.server_mods_dir.mkdir(parents=True, exist_ok=True)
 
     def _steam_login_parts(self) -> List[str]:
-        user = self.config.get("steam_user")
-        pwd = self.config.get("steam_password")
+        user, pwd = self._resolve_steam_credentials()
         if user and pwd:
             return ["+login", user, pwd]
         return ["+login", "anonymous"]
+
+    def _resolve_steam_credentials(self) -> tuple[str, str]:
+        user = str(self.config.get("steam_user") or self.config.get("steam_username") or "").strip()
+        pwd = str(self.config.get("steam_password") or "").strip()
+
+        steam_cfg_path = Path(self.config.get("steam_config_path", "config/steam.json"))
+        if steam_cfg_path.exists():
+            try:
+                with open(steam_cfg_path, "r", encoding="utf-8") as f:
+                    steam_cfg = json.load(f)
+                user = str(steam_cfg.get("steam_username") or user).strip()
+                pwd = str(steam_cfg.get("steam_password") or pwd).strip()
+            except (OSError, json.JSONDecodeError):
+                pass
+
+        return user, pwd
 
     def _steamcmd_executable(self) -> str:
         return self.config.get("steamcmd_path", "steamcmd")
