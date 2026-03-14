@@ -91,14 +91,25 @@ window.selectServer = async (id) => {
   const server = data.servers.find(s => s.id === id);
   if (!server) return;
 
+  const cfgEntries = Object.entries(server.config || {});
   q('#server-detail').innerHTML = `
     <h3>${server.name}</h3>
     <p>Porta: ${server.port}</p>
     <h4>Configuração</h4>
-    <label>Mapa <input id="cfg-map" value="${server.config.map}" /></label>
-    <label>Max jogadores <input id="cfg-max" type="number" value="${server.config.max_players}" /></label>
-    <label>Velocidade jogo <input id="cfg-speed" type="number" step="0.1" value="${server.config.game_speed}" /></label>
-    <label>Multiplicador tempo <input id="cfg-time" type="number" step="0.1" value="${server.config.time_multiplier}" /></label>
+    <div id="cfg-list">
+      ${cfgEntries.map(([key, value]) => `
+        <label style="display:flex; gap:8px; align-items:center; margin-bottom:6px;">
+          <input class="cfg-key" value="${key}" style="max-width:240px;" />
+          <input class="cfg-value" value="${String(value).replace(/"/g, '&quot;')}" style="flex:1;" />
+          <button type="button" class="danger cfg-remove">Remover</button>
+        </label>
+      `).join('') || '<p>Nenhum parâmetro no arquivo serverDZ.cfg.</p>'}
+    </div>
+    <div style="display:flex; gap:8px; margin:8px 0;">
+      <input id="new-cfg-key" placeholder="Novo parâmetro" />
+      <input id="new-cfg-value" placeholder="Valor" />
+      <button type="button" id="add-cfg">Adicionar</button>
+    </div>
     <button id="save-config">Salvar config</button>
 
     <h4>Mods do servidor</h4>
@@ -110,17 +121,45 @@ window.selectServer = async (id) => {
     <ul id="workshop-results"></ul>
   `;
 
+  q('#add-cfg').onclick = () => {
+    const key = q('#new-cfg-key').value.trim();
+    const value = q('#new-cfg-value').value;
+    if (!key) return;
+    const container = q('#cfg-list');
+    container.insertAdjacentHTML('beforeend', `
+      <label style="display:flex; gap:8px; align-items:center; margin-bottom:6px;">
+        <input class="cfg-key" value="${key}" style="max-width:240px;" />
+        <input class="cfg-value" value="${String(value).replace(/"/g, '&quot;')}" style="flex:1;" />
+        <button type="button" class="danger cfg-remove">Remover</button>
+      </label>
+    `);
+    q('#new-cfg-key').value = '';
+    q('#new-cfg-value').value = '';
+    bindConfigRemoveButtons();
+  };
+
+  function bindConfigRemoveButtons() {
+    document.querySelectorAll('.cfg-remove').forEach((btn) => {
+      btn.onclick = () => btn.closest('label')?.remove();
+    });
+  }
+
+  bindConfigRemoveButtons();
+
   q('#save-config').onclick = async () => {
+    const set = {};
+    document.querySelectorAll('#cfg-list label').forEach((row) => {
+      const key = row.querySelector('.cfg-key')?.value.trim();
+      const value = row.querySelector('.cfg-value')?.value ?? '';
+      if (key) set[key] = value;
+    });
+
     await getJson(`${api}/api/servers/${server.id}/config`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        map: q('#cfg-map').value,
-        max_players: Number(q('#cfg-max').value),
-        game_speed: Number(q('#cfg-speed').value),
-        time_multiplier: Number(q('#cfg-time').value),
-      }),
+      body: JSON.stringify({ set }),
     });
+    await window.selectServer(server.id);
     await refreshServers();
   };
 

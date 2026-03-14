@@ -2,12 +2,15 @@ from __future__ import annotations
 
 import json
 import os
+import re
+import shutil
+import subprocess
 import threading
 import time
 import uuid
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from typing import Dict, List
+from typing import Dict, List, Optional
 
 import psutil
 from flask import Flask, jsonify, request
@@ -30,6 +33,12 @@ MODS_FILE = DATA_DIR / "installed_mods.json"
 METRICS_FILE = DATA_DIR / "metrics.json"
 MAPS_FILE = Path(CONFIG.get("maps_config_path", "manager/maps.json"))
 DEFAULT_MODS_FILE = Path(CONFIG.get("mods_config_path", "config/mods.json"))
+SERVERS_ROOT = Path(CONFIG.get("servers_root", "servers"))
+STEAMCMD_APP_ID = str(CONFIG.get("dayz_server_app_id", "223350"))
+SERVER_BINARY_NAME = CONFIG.get("server_binary_name", "DayZServer_x64.exe")
+SERVER_CFG_NAME = CONFIG.get("server_cfg_name", "serverDZ.cfg")
+
+SERVER_PROCESSES: Dict[str, subprocess.Popen] = {}
 
 
 def read_json(path: Path, default):
@@ -54,6 +63,135 @@ def seed_files() -> None:
 
 
 seed_files()
+
+
+def _sanitize_server_folder(name: str) -> str:
+    cleaned = re.sub(r"[^A-Za-z0-9_.-]+", "_", name.strip())
+    return cleaned.strip("._") or "server"
+
+
+def _steam_login_parts() -> List[str]:
+    user = CONFIG.get("steam_user")
+    pwd = CONFIG.get("steam_password")
+    if user and pwd:
+        return ["+login", user, pwd]
+    return ["+login", "anonymous"]
+
+
+def _steamcmd_executable() -> str:
+    return CONFIG.get("steamcmd_path", "steamcmd")
+
+
+def _install_server_files(server_path: Path) -> None:
+    server_path.mkdir(parents=True, exist_ok=True)
+    cmd = [
+        _steamcmd_executable(),
+        *_steam_login_parts(),
+        "+force_install_dir",
+        str(server_path.resolve()),
+        "+app_update",
+        STEAMCMD_APP_ID,
+        "validate",
+        "+quit",
+    ]
+    subprocess.run(cmd, check=True)
+
+
+def _parse_server_cfg(cfg_path: Path) -> Dict[str, str]:
+    if not cfg_path.exists():
+        return {}
+
+    params: Dict[str, str] = {}
+    with open(cfg_path, "r", encoding="utf-8") as f:
+        for raw_line in f:
+            line = raw_line.strip()
+            if not line or line.startswith("//") or line.startswith("#"):
+                continue
+            if "=" not in line:
+                continue
+            key, value = line.split("=", 1)
+            key = key.strip()
+            value = value.strip().rstrip(";")
+            if value.startswith('"') and value.endswith('"') and len(value) >= 2:
+                value = value[1:-1]
+            params[key] = value
+    return params
+
+
+def _serialize_cfg_value(value) -> str:
+    if isinstance(value, bool):
+        return "1" if value else "0"
+    if isinstance(value, (int, float)):
+        return str(value)
+    text = str(value)
+    if text.lower() in {"true", "false"}:
+        return "1" if text.lower() == "true" else "0"
+    if re.fullmatch(r"[+-]?\d+(\.\d+)?", text):
+        return text
+    escaped = text.replace('"', '\\"')
+    return f'"{escaped}"'
+
+
+def _write_server_cfg(cfg_path: Path, params: Dict[str, str]) -> None:
+    ordered = sorted(params.items(), key=lambda item: item[0].lower())
+    with open(cfg_path, "w", encoding="utf-8") as f:
+        f.write("// Arquivo gerado automaticamente pelo painel\n")
+        for key, value in ordered:
+            f.write(f"{key} = {_serialize_cfg_value(value)};\n")
+
+
+def _default_server_cfg(name: str, port: int) -> Dict[str, str]:
+    return {
+        "hostname": name,
+        "password": "",
+        "passwordAdmin": "",
+        "maxPlayers": "60",
+        "verifySignatures": "2",
+        "disableVoN": "0",
+        "vonCodecQuality": "20",
+        "serverTimeAcceleration": "1",
+        "serverNightTimeAcceleration": "1",
+        "serverTimePersistent": "1",
+        "guaranteedUpdates": "1",
+        "steamPort": str(port + 100),
+    }
+
+
+def _find_server(servers: List[Dict], server_id: str) -> Optional[Dict]:
+    return next((s for s in servers if s["id"] == server_id), None)
+
+
+def _server_path(server: Dict) -> Path:
+    return Path(server["path"])
+
+
+def _build_mod_arg(server: Dict) -> str:
+    mods_catalog = {m["id"]: m for m in list_mods()}
+    folders = []
+    for mod_id in server.get("mods", []):
+        mod_data = mods_catalog.get(mod_id)
+        if mod_data and mod_data.get("folder"):
+            folders.append(mod_data["folder"])
+    if not folders:
+        return ""
+    return "-mod=" + ";".join(folders)
+
+
+def _start_server_process(server: Dict) -> subprocess.Popen:
+    server_dir = _server_path(server)
+    exe = server_dir / SERVER_BINARY_NAME
+    if not exe.exists():
+        raise FileNotFoundError(f"Executável não encontrado: {exe}")
+
+    cfg_path = server_dir / SERVER_CFG_NAME
+    if not cfg_path.exists():
+        _write_server_cfg(cfg_path, _default_server_cfg(server["name"], int(server["port"])))
+
+    cmd = [str(exe), f"-config={SERVER_CFG_NAME}"]
+    mod_arg = _build_mod_arg(server)
+    if mod_arg:
+        cmd.append(mod_arg)
+    return subprocess.Popen(cmd, cwd=server_dir)
 
 
 def now_iso() -> str:
@@ -222,18 +360,26 @@ def get_servers():
 @app.post("/api/servers")
 def create_server():
     body = request.get_json(force=True)
+    name = str(body["name"]).strip()
+    port = int(body["port"])
+    folder = _sanitize_server_folder(name)
+    server_dir = SERVERS_ROOT / folder
+
+    _install_server_files(server_dir)
+
+    cfg_path = server_dir / SERVER_CFG_NAME
+    if not cfg_path.exists():
+        _write_server_cfg(cfg_path, _default_server_cfg(name, port))
+
     server = {
         "id": str(uuid.uuid4()),
-        "name": body["name"],
-        "port": int(body["port"]),
+        "name": name,
+        "port": port,
         "status": "stopped",
+        "path": str(server_dir),
+        "folder": folder,
         "mods": [],
-        "config": {
-            "map": body.get("map", "chernarusplus"),
-            "max_players": int(body.get("max_players", 60)),
-            "time_multiplier": float(body.get("time_multiplier", 1.0)),
-            "game_speed": float(body.get("game_speed", 1.0)),
-        },
+        "config": _parse_server_cfg(cfg_path),
     }
     servers = list_servers()
     servers.append(server)
@@ -243,7 +389,21 @@ def create_server():
 
 @app.delete("/api/servers/<server_id>")
 def delete_server(server_id: str):
-    servers = [s for s in list_servers() if s["id"] != server_id]
+    servers = list_servers()
+    target = _find_server(servers, server_id)
+
+    process = SERVER_PROCESSES.pop(server_id, None)
+    if process and process.poll() is None:
+        process.terminate()
+        try:
+            process.wait(timeout=15)
+        except subprocess.TimeoutExpired:
+            process.kill()
+
+    if target:
+        shutil.rmtree(_server_path(target), ignore_errors=True)
+
+    servers = [s for s in servers if s["id"] != server_id]
     save_servers(servers)
     recompute_mod_usage()
     return jsonify({"deleted": server_id})
@@ -252,9 +412,19 @@ def delete_server(server_id: str):
 @app.post("/api/servers/<server_id>/start")
 def start_server(server_id: str):
     servers = list_servers()
-    for s in servers:
-        if s["id"] == server_id:
-            s["status"] = "running"
+    target = _find_server(servers, server_id)
+    if not target:
+        return jsonify({"error": "servidor não encontrado"}), 404
+
+    running = SERVER_PROCESSES.get(server_id)
+    if running and running.poll() is None:
+        target["status"] = "running"
+        save_servers(servers)
+        return jsonify({"status": "running"})
+
+    process = _start_server_process(target)
+    SERVER_PROCESSES[server_id] = process
+    target["status"] = "running"
     save_servers(servers)
     return jsonify({"status": "running"})
 
@@ -262,9 +432,19 @@ def start_server(server_id: str):
 @app.post("/api/servers/<server_id>/stop")
 def stop_server(server_id: str):
     servers = list_servers()
-    for s in servers:
-        if s["id"] == server_id:
-            s["status"] = "stopped"
+    target = _find_server(servers, server_id)
+    if not target:
+        return jsonify({"error": "servidor não encontrado"}), 404
+
+    process = SERVER_PROCESSES.pop(server_id, None)
+    if process and process.poll() is None:
+        process.terminate()
+        try:
+            process.wait(timeout=15)
+        except subprocess.TimeoutExpired:
+            process.kill()
+
+    target["status"] = "stopped"
     save_servers(servers)
     return jsonify({"status": "stopped"})
 
@@ -276,7 +456,20 @@ def update_server_config(server_id: str):
     updated = None
     for s in servers:
         if s["id"] == server_id:
-            s["config"].update(body)
+            current_cfg = s.get("config") or {}
+            updates = body.get("set", body)
+            removals = body.get("delete", [])
+
+            if isinstance(updates, dict):
+                for key, value in updates.items():
+                    current_cfg[str(key)] = str(value)
+
+            if isinstance(removals, list):
+                for key in removals:
+                    current_cfg.pop(str(key), None)
+
+            s["config"] = current_cfg
+            _write_server_cfg(_server_path(s) / SERVER_CFG_NAME, current_cfg)
             updated = s
     save_servers(servers)
     return jsonify(updated or {})
