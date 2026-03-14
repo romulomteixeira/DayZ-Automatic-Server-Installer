@@ -11,6 +11,7 @@ steamcmd/logs*
 steamcmd/pack*
 steamcmd/public*
 steamcmd/site*
+steamcmd/.crash
 steamcmd/steamapps*
 steamcmd/userdata*
 steamcmd/steamerrorreporter.exe
@@ -22,3 +23,4 @@ servers/server1/*
 servers/server2/*
 __pycache__/
 *.pyc
+Codex.txt
