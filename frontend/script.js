@@ -191,17 +191,69 @@ window.uninstallServerMod = async (serverId, modId) => {
 };
 
 q('#open-create-server').onclick = () => q('#server-modal').classList.remove('hidden');
-q('#close-modal').onclick = () => q('#server-modal').classList.add('hidden');
-q('#create-server').onclick = async () => {
-  await getJson(`${api}/api/servers`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ name: q('#server-name').value, port: Number(q('#server-port').value) }),
-  });
+q('#close-modal').onclick = () => {
+  if (q('#create-server').disabled) return;
   q('#server-modal').classList.add('hidden');
-  q('#server-name').value = '';
-  q('#server-port').value = '';
-  await refreshServers();
+};
+q('#create-server').onclick = async () => {
+  const name = q('#server-name').value.trim();
+  const port = Number(q('#server-port').value);
+  if (!name || !port) return;
+
+  const createBtn = q('#create-server');
+  const closeBtn = q('#close-modal');
+  const progressWrap = q('#create-server-progress');
+  const progressBar = q('#create-server-progress-bar');
+  const status = q('#create-server-status');
+
+  createBtn.disabled = true;
+  closeBtn.disabled = true;
+  progressWrap.classList.remove('hidden');
+  status.classList.remove('hidden');
+  progressBar.style.width = '8%';
+  status.textContent = 'Preparando criação do servidor...';
+
+  let value = 8;
+  const ticker = setInterval(() => {
+    if (value < 90) {
+      value += value < 45 ? 8 : 3;
+      progressBar.style.width = `${Math.min(value, 90)}%`;
+    }
+  }, 700);
+
+  try {
+    status.textContent = 'Instalando/replicando arquivos do DayZ Server...';
+    const created = await getJson(`${api}/api/servers`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name, port }),
+    });
+
+    progressBar.style.width = '100%';
+    if (created.default_backup_created) {
+      status.textContent = 'Servidor criado. Backup padrão foi gerado para acelerar próximas criações.';
+    } else {
+      status.textContent = 'Servidor criado com sucesso usando cópia do backup padrão.';
+    }
+
+    await refreshServers();
+    setTimeout(() => {
+      q('#server-modal').classList.add('hidden');
+      q('#server-name').value = '';
+      q('#server-port').value = '';
+      progressWrap.classList.add('hidden');
+      status.classList.add('hidden');
+      status.textContent = '';
+      progressBar.style.width = '0%';
+    }, 900);
+  } catch (err) {
+    status.textContent = `Falha ao criar servidor: ${err?.message || 'erro desconhecido'}`;
+    progressBar.style.width = '0%';
+  } finally {
+    clearInterval(ticker);
+    createBtn.disabled = false;
+    closeBtn.disabled = false;
+  }
 };
 
 async function refreshMods() {

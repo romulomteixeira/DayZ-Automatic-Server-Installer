@@ -14,6 +14,8 @@ Painel com **Home / Servidores / Mods**, histórico de métricas (CPU/RAM/Jogado
 - Menu **Servidores**:
   - Lista de servidores ativos/criados.
   - Criar servidor via modal (nome + porta).
+  - Na primeira criação, instala o servidor base e salva um backup local para acelerar criações futuras.
+  - Modal de criação com indicação visual de progresso durante instalação/cópia.
   - Iniciar, parar e deletar servidor.
   - Editar configuração (mapa, max players, velocidade do jogo, multiplicador de tempo).
   - Buscar mods por nome na Workshop Steam e instalar/desinstalar no servidor.

@@ -10,7 +10,7 @@ import time
 import uuid
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import Any, Dict, List, Optional
 
 import psutil
 from flask import Flask, jsonify, request
@@ -37,8 +37,10 @@ SERVERS_ROOT = Path(CONFIG.get("servers_root", "servers"))
 STEAMCMD_APP_ID = str(CONFIG.get("dayz_server_app_id", "223350"))
 SERVER_BINARY_NAME = CONFIG.get("server_binary_name", "DayZServer_x64.exe")
 SERVER_CFG_NAME = CONFIG.get("server_cfg_name", "serverDZ.cfg")
+DEFAULT_INSTALL_BACKUP_DIR = Path(CONFIG.get("default_install_backup_dir", "servers/.default_install_backup"))
 
 SERVER_PROCESSES: Dict[str, subprocess.Popen] = {}
+BACKUP_LOCK = threading.Lock()
 
 
 def read_json(path: Path, default):
@@ -111,6 +113,37 @@ def _install_server_files(server_path: Path) -> None:
         "+quit",
     ]
     subprocess.run(cmd, check=True)
+
+
+def _server_install_valid(path: Path) -> bool:
+    return (path / SERVER_BINARY_NAME).exists()
+
+
+def _copy_default_install(server_path: Path) -> None:
+    if server_path.exists():
+        shutil.rmtree(server_path)
+    shutil.copytree(DEFAULT_INSTALL_BACKUP_DIR, server_path)
+
+
+def _ensure_backup_default_install() -> bool:
+    with BACKUP_LOCK:
+        if _server_install_valid(DEFAULT_INSTALL_BACKUP_DIR):
+            return False
+
+        if DEFAULT_INSTALL_BACKUP_DIR.exists():
+            shutil.rmtree(DEFAULT_INSTALL_BACKUP_DIR, ignore_errors=True)
+
+        _install_server_files(DEFAULT_INSTALL_BACKUP_DIR)
+        return True
+
+
+def _prepare_server_install(server_path: Path) -> Dict[str, Any]:
+    created_backup = _ensure_backup_default_install()
+    _copy_default_install(server_path)
+    return {
+        "install_source": "default_backup",
+        "default_backup_created": created_backup,
+    }
 
 
 def _parse_server_cfg(cfg_path: Path) -> Dict[str, str]:
@@ -381,7 +414,7 @@ def create_server():
     folder = _sanitize_server_folder(name)
     server_dir = SERVERS_ROOT / folder
 
-    _install_server_files(server_dir)
+    install_meta = _prepare_server_install(server_dir)
 
     cfg_path = server_dir / SERVER_CFG_NAME
     if not cfg_path.exists():
@@ -400,7 +433,7 @@ def create_server():
     servers = list_servers()
     servers.append(server)
     save_servers(servers)
-    return jsonify(server), 201
+    return jsonify({**server, **install_meta}), 201
 
 
 @app.delete("/api/servers/<server_id>")
