@@ -20,3 +20,5 @@ manager/_*
 monitor/_*
 servers/server1/*
 servers/server2/*
+__pycache__/
+*.pyc

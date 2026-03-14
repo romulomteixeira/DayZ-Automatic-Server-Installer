@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>DayZ Manager</title>
+  <link rel="stylesheet" href="/styles.css" />
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+  <header class="top-menu">
+    <button data-view="home" class="active">Home</button>
+    <button data-view="servers">Servidores</button>
+    <button data-view="mods">Mods</button>
+  </header>
+
+  <div class="layout">
+    <aside class="sidebar">
+      <h3>Status Geral</h3>
+      <p>CPU: <strong id="cpu">-</strong></p>
+      <p>RAM: <strong id="ram">-</strong></p>
+      <p>Jogadores Online: <strong id="players-online">-</strong></p>
+      <ul id="players-list"></ul>
+    </aside>
+
+    <main class="content">
+      <section id="view-home" class="view active">
+        <div class="filters">
+          <label>Período
+            <select id="range">
+              <option value="1d">1 dia</option>
+              <option value="7d" selected>7 dias</option>
+              <option value="15d">15 dias</option>
+              <option value="1m">1 mês</option>
+              <option value="3m">3 meses</option>
+              <option value="6m">6 meses</option>
+              <option value="1y">1 ano</option>
+            </select>
+          </label>
+          <label>Início <input type="datetime-local" id="start-date" /></label>
+          <label>Fim <input type="datetime-local" id="end-date" /></label>
+          <button id="apply-range">Aplicar</button>
+        </div>
+
+        <div class="charts">
+          <div class="panel"><canvas id="cpuChart"></canvas></div>
+          <div class="panel"><canvas id="ramChart"></canvas></div>
+          <div class="panel"><canvas id="playersChart"></canvas></div>
+        </div>
+      </section>
+
+      <section id="view-servers" class="view">
+        <div class="header-row">
+          <h2>Servidores</h2>
+          <button id="open-create-server">Criar servidor</button>
+        </div>
+        <div class="servers-grid">
+          <div>
+            <ul id="servers-list"></ul>
+          </div>
+          <div class="panel" id="server-detail">
+            <p>Selecione um servidor.</p>
+          </div>
+        </div>
+      </section>
+
+      <section id="view-mods" class="view">
+        <h2>Mods instalados</h2>
+        <div class="filters">
+          <select id="mods-filter">
+            <option value="all">Todos</option>
+            <option value="used">Em uso</option>
+            <option value="unused">Não usados</option>
+          </select>
+          <button id="refresh-mods">Atualizar</button>
+        </div>
+        <ul id="mods-list"></ul>
+      </section>
+    </main>
+  </div>
+
+  <div id="server-modal" class="modal hidden">
+    <div class="modal-content">
+      <h3>Novo servidor</h3>
+      <input id="server-name" placeholder="Nome" />
+      <input id="server-port" placeholder="Porta" type="number" />
+      <div class="modal-actions">
+        <button id="create-server">Criar</button>
+        <button id="close-modal">Cancelar</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="/script.js"></script>
+</body>
+</html>
