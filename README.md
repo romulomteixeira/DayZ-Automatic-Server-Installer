@@ -38,6 +38,11 @@ Dados ficam em `data/manager`:
 - `installed_mods.json`
 - `metrics.json`
 
+## Credenciais SteamCMD
+
+- Para instalação de servidor/mods com conta Steam, crie `config/steam.json` com base em `config/steam_example.json`.
+- O backend agora prioriza as credenciais desse arquivo (`steam_username` / `steam_password`) e faz fallback para `config/manager.json`.
+
 ## Endpoints principais
 
 - `GET /api/home`

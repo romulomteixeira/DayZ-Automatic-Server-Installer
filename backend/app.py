@@ -71,11 +71,27 @@ def _sanitize_server_folder(name: str) -> str:
 
 
 def _steam_login_parts() -> List[str]:
-    user = CONFIG.get("steam_user")
-    pwd = CONFIG.get("steam_password")
+    user, pwd = _resolve_steam_credentials()
     if user and pwd:
         return ["+login", user, pwd]
     return ["+login", "anonymous"]
+
+
+def _resolve_steam_credentials() -> tuple[str, str]:
+    user = str(CONFIG.get("steam_user") or CONFIG.get("steam_username") or "").strip()
+    pwd = str(CONFIG.get("steam_password") or "").strip()
+
+    steam_cfg_path = Path(CONFIG.get("steam_config_path", "config/steam.json"))
+    if steam_cfg_path.exists():
+        try:
+            with open(steam_cfg_path, "r", encoding="utf-8") as f:
+                steam_cfg = json.load(f)
+            user = str(steam_cfg.get("steam_username") or user).strip()
+            pwd = str(steam_cfg.get("steam_password") or pwd).strip()
+        except (OSError, json.JSONDecodeError):
+            pass
+
+    return user, pwd
 
 
 def _steamcmd_executable() -> str:
