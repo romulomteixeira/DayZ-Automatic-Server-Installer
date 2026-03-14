@@ -97,7 +97,31 @@ def _resolve_steam_credentials() -> tuple[str, str]:
 
 
 def _steamcmd_executable() -> str:
-    return CONFIG.get("steamcmd_path", "steamcmd")
+    configured = str(CONFIG.get("steamcmd_path", "steamcmd")).strip() or "steamcmd"
+    candidates = [
+        configured,
+        "steamcmd",
+        "steamcmd.exe",
+        "steamcmd/steamcmd.exe",
+        "steamcmd/steamcmd.sh",
+        "./steamcmd/steamcmd.exe",
+        "./steamcmd/steamcmd.sh",
+    ]
+
+    for candidate in candidates:
+        cpath = Path(candidate)
+        if cpath.is_absolute() and cpath.exists():
+            return str(cpath)
+        if cpath.exists():
+            return str(cpath.resolve())
+        found = shutil.which(candidate)
+        if found:
+            return found
+
+    raise FileNotFoundError(
+        "SteamCMD não encontrado. Configure 'steamcmd_path' em config/manager.json "
+        "(ex.: 'steamcmd/steamcmd.exe' no Windows)."
+    )
 
 
 def _install_server_files(server_path: Path) -> None:
@@ -408,17 +432,47 @@ def get_servers():
 
 @app.post("/api/servers")
 def create_server():
-    body = request.get_json(force=True)
-    name = str(body["name"]).strip()
-    port = int(body["port"])
+    body = request.get_json(silent=True) or {}
+    name = str(body.get("name", "")).strip()
+    if not name:
+        return jsonify({"error": "nome do servidor é obrigatório"}), 400
+
+    try:
+        port = int(body.get("port"))
+    except (TypeError, ValueError):
+        return jsonify({"error": "porta inválida"}), 400
+
+    if port <= 0 or port > 65535:
+        return jsonify({"error": "porta deve estar entre 1 e 65535"}), 400
+
     folder = _sanitize_server_folder(name)
     server_dir = SERVERS_ROOT / folder
 
-    install_meta = _prepare_server_install(server_dir)
+    servers = list_servers()
+    if any(s.get("name", "").strip().lower() == name.lower() for s in servers):
+        return jsonify({"error": "já existe um servidor com esse nome"}), 409
+
+    if any(int(s.get("port", 0)) == port for s in servers):
+        return jsonify({"error": "já existe um servidor usando essa porta"}), 409
+
+    if any(Path(s.get("path", "")) == server_dir for s in servers):
+        return jsonify({"error": "pasta do servidor já está em uso por outro registro"}), 409
+
+    try:
+        install_meta = _prepare_server_install(server_dir)
+    except FileNotFoundError as exc:
+        return jsonify({"error": f"steamcmd não encontrado: {exc}"}), 500
+    except subprocess.CalledProcessError as exc:
+        return jsonify({"error": f"falha ao instalar arquivos base do servidor (steamcmd exit code {exc.returncode})"}), 500
+    except Exception as exc:
+        return jsonify({"error": f"falha ao preparar instalação do servidor: {exc}"}), 500
 
     cfg_path = server_dir / SERVER_CFG_NAME
-    if not cfg_path.exists():
-        _write_server_cfg(cfg_path, _default_server_cfg(name, port))
+    try:
+        if not cfg_path.exists():
+            _write_server_cfg(cfg_path, _default_server_cfg(name, port))
+    except Exception as exc:
+        return jsonify({"error": f"falha ao criar serverDZ.cfg: {exc}"}), 500
 
     server = {
         "id": str(uuid.uuid4()),
@@ -430,7 +484,6 @@ def create_server():
         "mods": [],
         "config": _parse_server_cfg(cfg_path),
     }
-    servers = list_servers()
     servers.append(server)
     save_servers(servers)
     return jsonify({**server, **install_meta}), 201

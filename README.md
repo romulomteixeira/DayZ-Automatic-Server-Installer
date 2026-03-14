@@ -44,6 +44,7 @@ Dados ficam em `data/manager`:
 
 - Para instalação de servidor/mods com conta Steam, crie `config/steam.json` com base em `config/steam_example.json`.
 - O backend agora prioriza as credenciais desse arquivo (`steam_username` / `steam_password`) e faz fallback para `config/manager.json`.
+- Se aparecer erro de SteamCMD não encontrado, configure `steamcmd_path` em `config/manager.json` (ex.: `steamcmd/steamcmd.exe` no Windows).
 
 ## Endpoints principais
 
