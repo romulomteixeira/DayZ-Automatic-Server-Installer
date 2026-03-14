@@ -1,0 +1,71 @@
+{
+  "chernarusplus": {
+    "name": "ChernarusPlus",
+    "workshop_id": "221100",
+    "type": "default",
+    "mission": "dayzOffline.chernarusplus"
+  },
+
+  "livonia": {
+    "name": "Livonia",
+    "workshop_id": "221100",
+    "type": "dlc",
+    "mission": "dayzOffline.enoch"
+  },
+
+  "namalsk": {
+    "name": "Namalsk Island",
+    "workshop_id": "2289456201",
+    "type": "map",
+    "mission": "namalsk.namalsk"
+  },
+
+  "deerisle": {
+    "name": "Deer Isle",
+    "workshop_id": "1602372402",
+    "type": "map",
+    "mission": "deerisle.deerisle"
+  },
+
+  "banov": {
+    "name": "Banov",
+    "workshop_id": "1616032601",
+    "type": "map",
+    "mission": "banov.banov"
+  },
+
+  "chiemsee": {
+    "name": "Chiemsee",
+    "workshop_id": "2979463088",
+    "type": "map",
+    "mission": "chiemsee.chiemsee"
+  },
+
+  "esseker": {
+    "name": "Esseker",
+    "workshop_id": "1733068190",
+    "type": "map",
+    "mission": "esseker.esseker"
+  },
+
+  "pripyat": {
+    "name": "Pripyat",
+    "workshop_id": "1710977250",
+    "type": "map",
+    "mission": "pripyat.pripyat"
+  },
+
+  "iztek": {
+    "name": "Iztek",
+    "workshop_id": "902583250",
+    "type": "map",
+    "mission": "iztek.iztek"
+  },
+
+  "takistan": {
+    "name": "Takistan Plus",
+    "workshop_id": "2649921570",
+    "type": "map",
+    "mission": "takistan.takistan"
+  }
+}

@@ -1,0 +1,20 @@
+<html>
+<head>
+<title>DayZ Server Panel</title>
+</head>
+
+<body>
+
+<h2>DayZ Server Control Panel</h2>
+
+<p>CPU Usage: {{cpu}}%</p>
+<p>RAM Usage: {{ram}}%</p>
+
+<p>Server Running: {{running}}</p>
+
+<button onclick="fetch('/start')">Start</button>
+<button onclick="fetch('/stop')">Stop</button>
+<button onclick="fetch('/restart')">Restart</button>
+
+</body>
+</html>

@@ -1,0 +1,9 @@
+{
+  "steam_user": "",
+  "server_path": "../server",
+  "steamcmd": "../steamcmd/steamcmd.exe",
+  "mods_file": "../mods.txt",
+  "port": 2302,
+  "restart_interval_minutes": 360,
+  "watchdog_interval": 30
+}

@@ -1,0 +1,10 @@
+// Create file steam.json and put that informations
+
+{
+  "steam_username": "seu-login",
+  "steam_password": "sua-senha",
+  "api_key": "api-key",
+  "auth_mode": "account",
+  "use_mobile_auth": false,
+  "use_mfa": false
+}

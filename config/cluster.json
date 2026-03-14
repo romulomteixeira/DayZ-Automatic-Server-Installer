@@ -1,0 +1,15 @@
+{
+ "cluster_name":"MyDayZCluster",
+ "servers":[
+  {
+   "name":"server1",
+   "path":"servers/server1",
+   "port":2302
+  },
+  {
+   "name":"server2",
+   "path":"servers/server2",
+   "port":2402
+  }
+ ]
+}
