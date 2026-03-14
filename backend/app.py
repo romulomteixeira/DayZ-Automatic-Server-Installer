@@ -97,7 +97,31 @@ def _resolve_steam_credentials() -> tuple[str, str]:
 
 
 def _steamcmd_executable() -> str:
-    return CONFIG.get("steamcmd_path", "steamcmd")
+    configured = str(CONFIG.get("steamcmd_path", "steamcmd")).strip() or "steamcmd"
+    candidates = [
+        configured,
+        "steamcmd",
+        "steamcmd.exe",
+        "steamcmd/steamcmd.exe",
+        "steamcmd/steamcmd.sh",
+        "./steamcmd/steamcmd.exe",
+        "./steamcmd/steamcmd.sh",
+    ]
+
+    for candidate in candidates:
+        cpath = Path(candidate)
+        if cpath.is_absolute() and cpath.exists():
+            return str(cpath)
+        if cpath.exists():
+            return str(cpath.resolve())
+        found = shutil.which(candidate)
+        if found:
+            return found
+
+    raise FileNotFoundError(
+        "SteamCMD não encontrado. Configure 'steamcmd_path' em config/manager.json "
+        "(ex.: 'steamcmd/steamcmd.exe' no Windows)."
+    )
 
 
 def _install_server_files(server_path: Path) -> None:

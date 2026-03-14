@@ -53,7 +53,31 @@ class DayZModInstaller:
         return user, pwd
 
     def _steamcmd_executable(self) -> str:
-        return self.config.get("steamcmd_path", "steamcmd")
+        configured = str(self.config.get("steamcmd_path", "steamcmd")).strip() or "steamcmd"
+        candidates = [
+            configured,
+            "steamcmd",
+            "steamcmd.exe",
+            "steamcmd/steamcmd.exe",
+            "steamcmd/steamcmd.sh",
+            "./steamcmd/steamcmd.exe",
+            "./steamcmd/steamcmd.sh",
+        ]
+
+        for candidate in candidates:
+            cpath = Path(candidate)
+            if cpath.is_absolute() and cpath.exists():
+                return str(cpath)
+            if cpath.exists():
+                return str(cpath.resolve())
+            found = shutil.which(candidate)
+            if found:
+                return found
+
+        raise FileNotFoundError(
+            "SteamCMD não encontrado. Configure 'steamcmd_path' em config/manager.json "
+            "(ex.: 'steamcmd/steamcmd.exe' no Windows)."
+        )
 
     def _run_steamcmd_download(self, mod_id: str) -> None:
         cmd = [
