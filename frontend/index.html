@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>DayZ Omega-style Manager</title>
+  <link rel="stylesheet" href="/styles.css" />
+</head>
+<body>
+  <main class="container">
+    <h1>DayZ Omega-style Manager</h1>
+    <section class="cards">
+      <article class="card"><h2>CPU</h2><p id="cpu">-</p></article>
+      <article class="card"><h2>RAM</h2><p id="ram">-</p></article>
+      <article class="card"><h2>Jogadores Online</h2><p id="players-count">-</p></article>
+    </section>
+
+    <section class="panel">
+      <h2>Ações</h2>
+      <div class="actions">
+        <button id="sync-mods">Instalador inteligente de mods</button>
+        <button id="install-chiemsee">Instalar mapa Chiemsee</button>
+      </div>
+      <pre id="output"></pre>
+    </section>
+
+    <section class="panel">
+      <h2>Monitor RCON</h2>
+      <ul id="players"></ul>
+      <p id="rcon-error" class="error"></p>
+    </section>
+  </main>
+  <script src="/script.js"></script>
+</body>
+</html>
