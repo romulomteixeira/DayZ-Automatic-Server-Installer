@@ -1,47 +1,55 @@
-# DayZ Automatic Server Installer - Docker Linux Refactor
+# DayZ Automatic Server Installer - Docker Linux
 
-## O que foi implementado
+Painel com **Home / Servidores / Mods**, histórico de métricas (CPU/RAM/Jogadores), gestão de servidores e gestão de mods com integração Workshop.
 
-- Resolução automática de dependências de mods via Steam Web API.
-- Geração automática do argumento `-mod=` com pastas instaladas.
-- Instalador inteligente de mods (download + cópia + dependências).
-- Endpoint dedicado para instalar o mapa **Chiemsee** automaticamente.
-- Painel web estilo manager com cards de status, ações e saída em tempo real.
-- Monitor de jogadores via RCON no backend (`players`).
-- Arquitetura separada em **2 containers**:
-  - `backend` (Python/Flask API + SteamCMD)
-  - `web` (Nginx estático)
+## Recursos
 
-## Subir com Docker
+- Dependências de mods resolvidas automaticamente.
+- Geração automática de `-mod=`.
+- Instalador inteligente de mods com dependências.
+- Instalação automática do mapa Chiemsee.
+- Monitor de jogadores via RCON.
+- Home com sidebar (CPU/RAM/Jogadores) + 3 gráficos de barras (CPU, RAM, players).
+- Seleção de período: 1d, 7d, 15d, 1m, 3m, 6m, 1y e intervalo manual por data.
+- Menu **Servidores**:
+  - Lista de servidores ativos/criados.
+  - Criar servidor via modal (nome + porta).
+  - Iniciar, parar e deletar servidor.
+  - Editar configuração (mapa, max players, velocidade do jogo, multiplicador de tempo).
+  - Buscar mods por nome na Workshop Steam e instalar/desinstalar no servidor.
+- Menu **Mods**:
+  - Lista de mods instalados.
+  - Filtro: todos / em uso / não usados.
+  - Remoção de mods não usados.
+
+## Docker
 
 ```bash
 docker compose up -d --build
 ```
 
-- Painel web: `http://localhost:8080`
-- API backend: `http://localhost:8000/api/health`
+- Frontend: `http://localhost:8080`
+- Backend: `http://localhost:8000`
 
-## Configuração
+## Persistência
 
-Arquivo principal: `config/manager.json`
+Dados ficam em `data/manager`:
+- `servers.json`
+- `installed_mods.json`
+- `metrics.json`
 
-- `steam_user` e `steam_password`: credenciais (opcional para mods públicos).
-- `workshop_content_dir`: caminho de download do workshop.
-- `server_mods_dir`: pasta onde os mods serão instalados no servidor.
-- `rcon_host`, `rcon_port`, `rcon_password`: dados de acesso RCON.
+## Endpoints principais
 
-## Endpoints
-
-- `GET /api/status`
-- `POST /api/mods/sync`
-- `POST /api/maps/chiemsee/install`
-
-Exemplo de sincronização com dependências:
-
-```bash
-curl -X POST http://localhost:8000/api/mods/sync \
-  -H 'Content-Type: application/json' \
-  -d '{"mods": ["1559212036", "1828439124"], "include_chiemsee": true}'
-```
-
-O backend resolve dependências recursivamente e retorna `mod_arg` pronto para uso.
+- `GET /api/home`
+- `GET /api/metrics?range=7d`
+- `GET /api/servers`
+- `POST /api/servers`
+- `DELETE /api/servers/<id>`
+- `POST /api/servers/<id>/start`
+- `POST /api/servers/<id>/stop`
+- `PUT /api/servers/<id>/config`
+- `GET /api/workshop/search?q=cf`
+- `POST /api/servers/<id>/mods/install`
+- `POST /api/servers/<id>/mods/uninstall`
+- `GET /api/mods?filter=all|used|unused`
+- `DELETE /api/mods/<id>`

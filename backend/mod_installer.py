@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import json
-import os
 import re
 import shutil
 import subprocess
@@ -14,6 +13,7 @@ import requests
 STEAM_PUBLISHED_FILE_DETAILS_URL = (
     "https://api.steampowered.com/ISteamRemoteStorage/GetPublishedFileDetails/v1/"
 )
+WORKSHOP_SEARCH_URL = "https://steamcommunity.com/workshop/browse/"
 
 
 @dataclass
@@ -24,8 +24,6 @@ class ModInfo:
 
 
 class DayZModInstaller:
-    """Instala mods de forma inteligente, resolve dependências e gera launch args."""
-
     def __init__(self, config: Dict):
         self.config = config
         self.server_mods_dir = Path(config["server_mods_dir"])
@@ -91,7 +89,6 @@ class DayZModInstaller:
 
         for mod_id in root_mod_ids:
             walk(str(mod_id))
-
         return list(resolved.values())
 
     @staticmethod
@@ -130,15 +127,41 @@ class DayZModInstaller:
             folder = self._install_downloaded_mod(mod)
             installed_folders.append(folder)
 
-        mod_arg = "-mod=" + ";".join(installed_folders)
         return {
             "resolved_mods": [
                 {"id": m.mod_id, "title": m.title, "dependencies": m.dependencies}
                 for m in mod_infos
             ],
-            "mod_arg": mod_arg,
+            "mod_arg": "-mod=" + ";".join(installed_folders),
             "mod_folders": installed_folders,
         }
+
+    def uninstall_mod_folder(self, folder_name: str) -> None:
+        target = self.server_mods_dir / folder_name
+        if target.exists() and target.is_dir():
+            shutil.rmtree(target)
+
+    def search_workshop(self, query: str, limit: int = 10) -> List[Dict]:
+        params = {"appid": 221100, "searchtext": query, "browsesort": "trend", "section": "readytouseitems"}
+        response = requests.get(WORKSHOP_SEARCH_URL, params=params, timeout=30)
+        response.raise_for_status()
+        html = response.text
+
+        results: List[Dict] = []
+        seen: Set[str] = set()
+        for mod_id in re.findall(r'"publishedfileid"\s*:\s*"(\d+)"', html):
+            if mod_id in seen:
+                continue
+            seen.add(mod_id)
+            try:
+                details = self._fetch_details([mod_id]).get(mod_id)
+                if details:
+                    results.append({"id": details.mod_id, "title": details.title})
+            except Exception:
+                continue
+            if len(results) >= limit:
+                break
+        return results
 
 
 def load_manager_config(path: str = "config/manager.json") -> Dict:

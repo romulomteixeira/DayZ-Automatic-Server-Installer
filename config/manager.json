@@ -6,6 +6,8 @@
   "server_mods_dir": "/data/server/mods",
   "mods_config_path": "config/mods.json",
   "maps_config_path": "manager/maps.json",
+  "data_dir": "data/manager",
+  "metrics_interval_seconds": 300,
   "rcon_host": "dayz-server",
   "rcon_port": 2305,
   "rcon_password": "adminpass"
